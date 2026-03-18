@@ -42,14 +42,14 @@
                 "programas",
                 "python"
             ],
-            "total_clicks": 17,
+            "total_clicks": 16,
             "weekly_clicks": {
                 "2026-W10": 3,
                 "2026-W11": 10,
-                "2026-W12": 4
+                "2026-W12": 3
             },
             "created_at": "2026-03-04T20:52:25",
-            "last_used_at": "2026-03-18T19:13:04",
+            "last_used_at": "2026-03-18T17:54:59",
             "resources": []
         },
         "SEFAZ": {

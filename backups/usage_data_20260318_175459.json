@@ -3,7 +3,7 @@
     "settings": {
         "theme": "dark",
         "sort_mode": "weekly",
-        "last_report_week": "2026-W11"
+        "last_report_week": "2026-W12"
     },
     "shortcuts": {
         "GLOSSÁRIO": {
@@ -16,10 +16,15 @@
         },
         "quadrante": {
             "path": "C:/Users/diego/Desktop/001-Desktop/escola/AUTOMACOES-ESCOLOA/Selenium/quadrante-202511111728.py",
-            "total_clicks": 3,
+            "total_clicks": 7,
             "weekly_clicks": {
-                "2026-W09": 3
-            }
+                "2026-W09": 3,
+                "2026-W12": 4
+            },
+            "last_used_at": "2026-03-18T11:51:19",
+            "target": "C:\\Users\\diego\\Desktop\\001-Desktop\\escola\\AUTOMACOES-ESCOLOA\\Selenium\\quadrante-202511111728.py",
+            "category": "",
+            "tags": []
         },
         "ProgramasCriadosPorMim": {
             "target": "C:\\Users\\diego\\Desktop\\001-Desktop\\programas\\ProgramasCriadosPorMim",
@@ -29,13 +34,14 @@
                 "programas",
                 "python"
             ],
-            "total_clicks": 13,
+            "total_clicks": 15,
             "weekly_clicks": {
                 "2026-W10": 3,
-                "2026-W11": 10
+                "2026-W11": 10,
+                "2026-W12": 2
             },
             "created_at": "2026-03-04T20:52:25",
-            "last_used_at": "2026-03-14T07:40:35"
+            "last_used_at": "2026-03-18T11:47:23"
         },
         "SEFAZ": {
             "target": "C:\\Users\\diego\\Desktop\\001-Desktop\\diegoPaladino\\IA\\Nexa\\ECOSSISTEMA\\CLT-Concurso-Financia\\2-Concurso\\SEFAZ",
@@ -46,13 +52,14 @@
                 "prova",
                 "sefaz"
             ],
-            "total_clicks": 12,
+            "total_clicks": 14,
             "weekly_clicks": {
                 "2026-W10": 3,
-                "2026-W11": 9
+                "2026-W11": 9,
+                "2026-W12": 2
             },
             "created_at": "2026-03-05T05:29:22",
-            "last_used_at": "2026-03-15T08:33:02"
+            "last_used_at": "2026-03-16T19:04:23"
         },
         "Rede_escola": {
             "target": "C:\\Users\\Public",
@@ -77,12 +84,29 @@
                 "concurso",
                 "sefaz"
             ],
-            "total_clicks": 8,
+            "total_clicks": 21,
             "weekly_clicks": {
-                "2026-W11": 8
+                "2026-W11": 17,
+                "2026-W12": 4
             },
             "created_at": "2026-03-14T07:42:37",
-            "last_used_at": "2026-03-15T15:33:55"
+            "last_used_at": "2026-03-18T17:48:20"
+        },
+        "Github": {
+            "target": "https://github.com/diegoPaladino",
+            "category": "programação",
+            "tags": [
+                "programação",
+                "github",
+                "código",
+                "vscode",
+                "versão",
+                "salvar"
+            ],
+            "total_clicks": 0,
+            "weekly_clicks": {},
+            "created_at": "2026-03-18T17:54:24",
+            "last_used_at": null
         }
     }
 }

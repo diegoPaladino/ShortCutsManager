@@ -21,7 +21,6 @@ APP_TITLE = "ShortCutsManager"
 DATA_FILE = "usage_data.json"
 REPORTS_DIR = "reports"
 BACKUPS_DIR = "backups"
-DATA_VERSION = 3
 
 BACKUP_KEEP_LAST = 30
 MAX_GRID_COLS = 4
@@ -157,88 +156,6 @@ def _is_url(s: str) -> bool:
     return s.startswith("http://") or s.startswith("https://")
 
 
-def _split_tags(raw: Any) -> List[str]:
-    if isinstance(raw, list):
-        return [str(t).strip() for t in raw if str(t).strip()]
-    if isinstance(raw, str):
-        return [t.strip() for t in raw.split(",") if t.strip()]
-    return []
-
-
-def _normalize_weekly_clicks(raw: Any) -> Dict[str, int]:
-    weekly: Dict[str, int] = {}
-    if not isinstance(raw, dict):
-        return weekly
-    for key, value in raw.items():
-        try:
-            weekly[str(key)] = int(value)
-        except (TypeError, ValueError):
-            weekly[str(key)] = 0
-    return weekly
-
-
-def _guess_target_kind(target: str, fallback: str = "file") -> str:
-    if _is_url(target):
-        return "url"
-    if os.path.isdir(target):
-        return "folder"
-    return fallback
-
-
-def _kind_label(kind: str) -> str:
-    labels = {
-        "url": "Link",
-        "folder": "Pasta",
-        "file": "Arquivo/Programa",
-    }
-    return labels.get(kind, "Arquivo/Programa")
-
-
-def _normalize_resource_record(item: Any) -> Optional[Dict[str, Any]]:
-    if not isinstance(item, dict):
-        return None
-
-    name = str(item.get("name") or "").strip()
-    target = str(item.get("target") or item.get("path") or "").strip()
-    if not name or not target:
-        return None
-
-    kind = _guess_target_kind(target, fallback=str(item.get("kind") or "file"))
-    return {
-        "name": name,
-        "target": target,
-        "kind": kind,
-        "tags": _split_tags(item.get("tags", [])),
-        "total_clicks": int(item.get("total_clicks", 0) or 0),
-        "weekly_clicks": _normalize_weekly_clicks(item.get("weekly_clicks", {})),
-        "created_at": item.get("created_at"),
-        "last_used_at": item.get("last_used_at"),
-    }
-
-
-def _normalize_shortcut_record(item: Any) -> Dict[str, Any]:
-    sc = item if isinstance(item, dict) else {}
-    target = str(sc.get("target") or sc.get("path") or "").strip()
-
-    resources: List[Dict[str, Any]] = []
-    for resource in sc.get("resources", []):
-        normalized = _normalize_resource_record(resource)
-        if normalized:
-            resources.append(normalized)
-
-    return {
-        **sc,
-        "target": target,
-        "category": str(sc.get("category") or "").strip(),
-        "tags": _split_tags(sc.get("tags", [])),
-        "resources": resources,
-        "total_clicks": int(sc.get("total_clicks", 0) or 0),
-        "weekly_clicks": _normalize_weekly_clicks(sc.get("weekly_clicks", {})),
-        "created_at": sc.get("created_at"),
-        "last_used_at": sc.get("last_used_at"),
-    }
-
-
 def _backup_file(src: str):
     if not os.path.exists(src):
         return
@@ -269,7 +186,7 @@ def _save_json_atomic(path: str, data: Dict[str, Any]):
 def _load_json(path: str) -> Dict[str, Any]:
     if not os.path.exists(path):
         return {
-            "version": DATA_VERSION,
+            "version": 2,
             "settings": {"theme": "dark", "sort_mode": DEFAULT_SORT_MODE, "last_report_week": None},
             "shortcuts": {},
         }
@@ -278,26 +195,16 @@ def _load_json(path: str) -> Dict[str, Any]:
 
     if "version" not in data:
         data = {
-            "version": DATA_VERSION,
+            "version": 2,
             "settings": {"theme": "dark", "sort_mode": DEFAULT_SORT_MODE, "last_report_week": None},
             "shortcuts": data.get("shortcuts", {}),
         }
 
-    try:
-        loaded_version = int(data.get("version", DATA_VERSION) or DATA_VERSION)
-    except (TypeError, ValueError):
-        loaded_version = DATA_VERSION
-    data["version"] = max(loaded_version, DATA_VERSION)
     data.setdefault("settings", {})
     data["settings"].setdefault("theme", "dark")
     data["settings"].setdefault("sort_mode", DEFAULT_SORT_MODE)
     data["settings"].setdefault("last_report_week", None)
     data.setdefault("shortcuts", {})
-    data["shortcuts"] = {
-        str(name): _normalize_shortcut_record(sc)
-        for name, sc in data.get("shortcuts", {}).items()
-        if str(name).strip()
-    }
 
     return data
 
@@ -751,17 +658,7 @@ class ShortCutsManagerApp:
                 return True
             tags = " ".join(sc.get("tags", [])).lower()
             target = (sc.get("target") or "").lower()
-            resources_blob = " ".join(
-                " ".join(
-                    [
-                        (resource.get("name") or ""),
-                        " ".join(resource.get("tags", [])),
-                        (resource.get("target") or ""),
-                    ]
-                )
-                for resource in sc.get("resources", [])
-            ).lower()
-            return (q in name.lower()) or (q in tags) or (q in target) or (q in resources_blob)
+            return (q in name.lower()) or (q in tags) or (q in target)
 
         shortcuts = [(n, sc) for (n, sc) in shortcuts if match(n, sc)]
 
@@ -777,78 +674,6 @@ class ShortCutsManagerApp:
 
         return shortcuts
 
-    def _prompt_for_target(self, parent: Optional[tk.Misc] = None) -> Optional[Tuple[str, str]]:
-        use_url = messagebox.askyesnocancel(
-            "Tipo",
-            "Qual tipo de atalho?\n\nSim = URL\nNão = Arquivo / Script / Pasta",
-            parent=parent or self.root,
-        )
-        if use_url is None:
-            return None
-
-        if use_url:
-            target = simpledialog.askstring("URL", "Cole a URL (https://...):", parent=parent or self.root)
-            if target is None:
-                return None
-            target = target.strip()
-            if not _is_url(target):
-                messagebox.showerror("Erro", "URL inválida. Use http:// ou https://", parent=parent or self.root)
-                return None
-            return target, "url"
-
-        is_folder = messagebox.askyesno(
-            "Arquivo ou Pasta?",
-            "Você quer selecionar uma PASTA?\n\nSim = Pasta\nNão = Arquivo/Script",
-            parent=parent or self.root,
-        )
-        if is_folder:
-            target = filedialog.askdirectory(title="Selecione a pasta", parent=parent or self.root)
-            if not target:
-                return None
-            return _normalize_path(target), "folder"
-
-        target = filedialog.askopenfilename(title="Selecione o arquivo (.exe/.lnk/.py/.bat etc)", parent=parent or self.root)
-        if not target:
-            return None
-        return _normalize_path(target), "file"
-
-    def _confirm_target_save(self, target: str, parent: Optional[tk.Misc] = None) -> bool:
-        valid = _is_url(target) or os.path.exists(target) or os.path.isdir(target)
-        if valid:
-            return True
-        return bool(
-            messagebox.askyesno(
-                "Atenção",
-                "O target não existe agora.\nQuer salvar mesmo assim?",
-                parent=parent or self.root,
-            )
-        )
-
-    def _find_resource_index(self, sc: Dict[str, Any], resource_name: str) -> Optional[int]:
-        target_name = resource_name.strip().lower()
-        for idx, resource in enumerate(sc.get("resources", [])):
-            if (resource.get("name") or "").strip().lower() == target_name:
-                return idx
-        return None
-
-    def _resource_details_text(self, resource: Optional[Dict[str, Any]]) -> str:
-        if not resource:
-            return "Selecione um item adicional para ver os detalhes."
-
-        tags = ", ".join(resource.get("tags", [])) or "—"
-        week = _week_key()
-        return "\n".join(
-            [
-                f"Nome: {resource.get('name', '—')}",
-                f"Tipo: {_kind_label(resource.get('kind', 'file'))}",
-                f"Target: {resource.get('target', '—')}",
-                f"Tags: {tags}",
-                f"Semana: {_get_weekly_count(resource, week)}",
-                f"Total: {int(resource.get('total_clicks', 0))}",
-                f"Último uso: {resource.get('last_used_at') or '—'}",
-            ]
-        )
-
     # ---------- Actions ----------
     def add_shortcut(self):
         name = simpledialog.askstring("Novo Atalho", "Nome do botão:")
@@ -861,10 +686,30 @@ class ShortCutsManagerApp:
             messagebox.showerror("Erro", "Já existe um atalho com esse nome.")
             return
 
-        target_result = self._prompt_for_target()
-        if not target_result:
-            return
-        target, _kind = target_result
+        kind = messagebox.askquestion(
+            "Tipo",
+            "Qual tipo de atalho?\n\nSim = URL\nNão = Arquivo / Script / Pasta",
+        )
+
+        if kind == "yes":
+            target = simpledialog.askstring("URL", "Cole a URL (https://...):")
+            if not target or not _is_url(target):
+                messagebox.showerror("Erro", "URL inválida. Use http:// ou https://")
+                return
+            target = target.strip()
+        else:
+            # ✅ NOVO: perguntar se é PASTA
+            is_folder = messagebox.askyesno("Arquivo ou Pasta?", "Você quer selecionar uma PASTA?\n\nSim = Pasta\nNão = Arquivo/Script")
+            if is_folder:
+                target = filedialog.askdirectory(title="Selecione a pasta")
+                if not target:
+                    return
+                target = _normalize_path(target)
+            else:
+                target = filedialog.askopenfilename(title="Selecione o arquivo (.exe/.lnk/.py/.bat etc)")
+                if not target:
+                    return
+                target = _normalize_path(target)
 
         category = simpledialog.askstring("Categoria", "Categoria (ex: Trabalho, Dev, Pessoal) — opcional:")
         category = (category or "").strip()
@@ -878,7 +723,6 @@ class ShortCutsManagerApp:
             "target": target,
             "category": category,
             "tags": tags,
-            "resources": [],
             "total_clicks": 0,
             "weekly_clicks": {},
             "created_at": datetime.now().isoformat(timespec="seconds"),
@@ -908,8 +752,10 @@ class ShortCutsManagerApp:
             return
         target_new = target_new.strip()
 
-        if not self._confirm_target_save(target_new):
-            return
+        valid = _is_url(target_new) or os.path.exists(target_new) or os.path.isdir(target_new)
+        if not valid:
+            if messagebox.askyesno("Atenção", "O target não existe agora.\nQuer salvar mesmo assim?") is False:
+                return
 
         category_new = simpledialog.askstring("Editar", "Categoria:", initialvalue=sc.get("category", "") or "")
         category_new = (category_new or "").strip()
@@ -954,316 +800,6 @@ class ShortCutsManagerApp:
             self.refresh()
         except Exception as e:
             messagebox.showerror("Erro ao executar", str(e))
-
-    def add_resource(self, shortcut_name: str, parent: Optional[tk.Misc] = None) -> Optional[str]:
-        sc = self.data["shortcuts"].get(shortcut_name)
-        if not sc:
-            return None
-
-        resource_name = simpledialog.askstring("Novo Item", "Nome do item adicional:", parent=parent or self.root)
-        if resource_name is None:
-            return None
-        resource_name = resource_name.strip()
-        if not resource_name:
-            return None
-        if self._find_resource_index(sc, resource_name) is not None:
-            messagebox.showerror("Erro", "Já existe um item com esse nome dentro deste atalho.", parent=parent or self.root)
-            return None
-
-        target_result = self._prompt_for_target(parent=parent)
-        if not target_result:
-            return None
-        target, kind = target_result
-
-        tags_raw = simpledialog.askstring(
-            "Tags",
-            "Tags separadas por vírgula (ex: pasta, edital, utilitário) — opcional:",
-            parent=parent or self.root,
-        )
-        tags = _split_tags(tags_raw or "")
-
-        sc.setdefault("resources", []).append(
-            {
-                "name": resource_name,
-                "target": target,
-                "kind": kind,
-                "tags": tags,
-                "total_clicks": 0,
-                "weekly_clicks": {},
-                "created_at": datetime.now().isoformat(timespec="seconds"),
-                "last_used_at": None,
-            }
-        )
-        self._save()
-        self.refresh()
-        return resource_name
-
-    def edit_resource(self, shortcut_name: str, resource_name: str, parent: Optional[tk.Misc] = None) -> Optional[str]:
-        sc = self.data["shortcuts"].get(shortcut_name)
-        if not sc:
-            return None
-
-        resource_index = self._find_resource_index(sc, resource_name)
-        if resource_index is None:
-            return None
-
-        resource = sc["resources"][resource_index]
-
-        new_name = simpledialog.askstring(
-            "Editar Item",
-            "Nome do item adicional:",
-            initialvalue=resource.get("name", ""),
-            parent=parent or self.root,
-        )
-        if new_name is None:
-            return None
-        new_name = new_name.strip()
-        if not new_name:
-            return None
-
-        existing_index = self._find_resource_index(sc, new_name)
-        if existing_index is not None and existing_index != resource_index:
-            messagebox.showerror("Erro", "Já existe um item com esse nome dentro deste atalho.", parent=parent or self.root)
-            return None
-
-        target_new = simpledialog.askstring(
-            "Editar Item",
-            "Target (URL / caminho de arquivo / pasta):",
-            initialvalue=resource.get("target", ""),
-            parent=parent or self.root,
-        )
-        if target_new is None:
-            return None
-        target_new = target_new.strip()
-        if not target_new:
-            return None
-        if not self._confirm_target_save(target_new, parent=parent):
-            return None
-
-        tags_raw = simpledialog.askstring(
-            "Editar Item",
-            "Tags (vírgula):",
-            initialvalue=", ".join(resource.get("tags", [])),
-            parent=parent or self.root,
-        )
-        tags_new = _split_tags(tags_raw or "")
-
-        resource.update(
-            {
-                "name": new_name,
-                "target": target_new,
-                "kind": _guess_target_kind(target_new, fallback=resource.get("kind", "file")),
-                "tags": tags_new,
-            }
-        )
-        self._save()
-        self.refresh()
-        return new_name
-
-    def delete_resource(self, shortcut_name: str, resource_name: str, parent: Optional[tk.Misc] = None) -> bool:
-        sc = self.data["shortcuts"].get(shortcut_name)
-        if not sc:
-            return False
-
-        resource_index = self._find_resource_index(sc, resource_name)
-        if resource_index is None:
-            return False
-
-        if not messagebox.askyesno(
-            "Confirmar",
-            f"Excluir o item '{resource_name}' de '{shortcut_name}'?",
-            parent=parent or self.root,
-        ):
-            return False
-
-        sc["resources"].pop(resource_index)
-        self._save()
-        self.refresh()
-        return True
-
-    def run_resource(self, shortcut_name: str, resource_name: str, parent: Optional[tk.Misc] = None) -> bool:
-        sc = self.data["shortcuts"].get(shortcut_name)
-        if not sc:
-            return False
-
-        resource_index = self._find_resource_index(sc, resource_name)
-        if resource_index is None:
-            return False
-
-        resource = sc["resources"][resource_index]
-        target = resource.get("target", "")
-        try:
-            _open_target(target)
-            _increment_usage(resource, _week_key())
-            _increment_usage(sc, _week_key())
-            self._save()
-            self.refresh()
-            return True
-        except Exception as e:
-            messagebox.showerror("Erro ao executar", str(e), parent=parent or self.root)
-            return False
-
-    def manage_resources(self, shortcut_name: str):
-        sc = self.data["shortcuts"].get(shortcut_name)
-        if not sc:
-            return
-
-        win = tk.Toplevel(self.root)
-        win.title(f"Itens adicionais - {shortcut_name}")
-        win.geometry("880x460")
-        win.minsize(760, 380)
-        win.configure(bg=self.theme.bg)
-
-        main = tk.Frame(win, bg=self.theme.bg)
-        main.pack(fill="both", expand=True, padx=12, pady=12)
-        main.grid_columnconfigure(0, weight=1, uniform="resources")
-        main.grid_columnconfigure(1, weight=1, uniform="resources")
-        main.grid_rowconfigure(1, weight=1)
-
-        header_var = tk.StringVar()
-        header = tk.Label(main, textvariable=header_var, bg=self.theme.bg, fg=self.theme.text, font=("Segoe UI", 12, "bold"))
-        header.grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, 10))
-
-        list_frame = tk.Frame(main, bg=self.theme.panel, highlightthickness=1, highlightbackground=self.theme.panel)
-        list_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
-        list_frame.grid_rowconfigure(0, weight=1)
-        list_frame.grid_columnconfigure(0, weight=1)
-
-        details_frame = tk.Frame(main, bg=self.theme.panel, highlightthickness=1, highlightbackground=self.theme.panel)
-        details_frame.grid(row=1, column=1, sticky="nsew")
-        details_frame.grid_rowconfigure(1, weight=1)
-        details_frame.grid_columnconfigure(0, weight=1)
-
-        listbox = tk.Listbox(
-            list_frame,
-            activestyle="none",
-            bg=self.theme.btn,
-            fg=self.theme.text,
-            selectbackground=self.theme.accent,
-            selectforeground="#ffffff",
-            relief="flat",
-            highlightthickness=0,
-            font=("Segoe UI", 10),
-        )
-        scroll = tk.Scrollbar(list_frame, orient="vertical", command=listbox.yview)
-        listbox.configure(yscrollcommand=scroll.set)
-        listbox.grid(row=0, column=0, sticky="nsew")
-        scroll.grid(row=0, column=1, sticky="ns")
-
-        details_title = tk.Label(details_frame, text="Detalhes", bg=self.theme.panel, fg=self.theme.text, font=("Segoe UI", 11, "bold"))
-        details_title.grid(row=0, column=0, sticky="w", padx=12, pady=(12, 8))
-
-        details_var = tk.StringVar(value="Selecione um item adicional para ver os detalhes.")
-        details = tk.Label(
-            details_frame,
-            textvariable=details_var,
-            bg=self.theme.panel,
-            fg=self.theme.muted,
-            justify="left",
-            anchor="nw",
-            wraplength=340,
-            font=("Segoe UI", 10),
-        )
-        details.grid(row=1, column=0, sticky="nsew", padx=12, pady=(0, 12))
-
-        buttons = tk.Frame(main, bg=self.theme.bg)
-        buttons.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(12, 0))
-        for col in range(5):
-            buttons.grid_columnconfigure(col, weight=1, uniform="resource_buttons")
-
-        def selected_name() -> Optional[str]:
-            selection = listbox.curselection()
-            if not selection:
-                return None
-            resources = sc.get("resources", [])
-            index = selection[0]
-            if index >= len(resources):
-                return None
-            return resources[index].get("name")
-
-        def refresh_list(select_name: Optional[str] = None):
-            resources = sc.get("resources", [])
-            header_var.set(f"Itens adicionais de '{shortcut_name}': {len(resources)}")
-            listbox.delete(0, tk.END)
-            selected_index: Optional[int] = None
-
-            for idx, resource in enumerate(resources):
-                tags_text = ", ".join(resource.get("tags", [])[:2])
-                suffix = f" | {tags_text}" if tags_text else ""
-                listbox.insert(tk.END, f"{resource.get('name')} [{_kind_label(resource.get('kind', 'file'))}]{suffix}")
-                if select_name and (resource.get("name") == select_name):
-                    selected_index = idx
-
-            if resources:
-                if selected_index is None:
-                    selected_index = 0
-                listbox.selection_clear(0, tk.END)
-                listbox.selection_set(selected_index)
-                listbox.activate(selected_index)
-                current = resources[selected_index]
-                details_var.set(self._resource_details_text(current))
-            else:
-                details_var.set("Este atalho ainda não possui itens adicionais.")
-
-        def update_details(_event=None):
-            name = selected_name()
-            if not name:
-                details_var.set("Selecione um item adicional para ver os detalhes.")
-                return
-            resource_index = self._find_resource_index(sc, name)
-            if resource_index is None:
-                details_var.set("Selecione um item adicional para ver os detalhes.")
-                return
-            details_var.set(self._resource_details_text(sc["resources"][resource_index]))
-
-        def on_add():
-            created_name = self.add_resource(shortcut_name, parent=win)
-            if created_name:
-                refresh_list(select_name=created_name)
-
-        def on_edit():
-            name = selected_name()
-            if not name:
-                messagebox.showinfo("Itens adicionais", "Selecione um item para editar.", parent=win)
-                return
-            updated_name = self.edit_resource(shortcut_name, name, parent=win)
-            if updated_name:
-                refresh_list(select_name=updated_name)
-                update_details()
-
-        def on_delete():
-            name = selected_name()
-            if not name:
-                messagebox.showinfo("Itens adicionais", "Selecione um item para excluir.", parent=win)
-                return
-            if self.delete_resource(shortcut_name, name, parent=win):
-                refresh_list()
-
-        def on_run(_event=None):
-            name = selected_name()
-            if not name:
-                messagebox.showinfo("Itens adicionais", "Selecione um item para abrir.", parent=win)
-                return
-            if self.run_resource(shortcut_name, name, parent=win):
-                refresh_list(select_name=name)
-                update_details()
-
-        btn_run_resource = tk.Button(buttons, text="Abrir item", command=on_run, bg=self.theme.accent, fg="#ffffff", relief="flat", padx=10, pady=6)
-        btn_add_resource = tk.Button(buttons, text="Adicionar item", command=on_add, bg=self.theme.btn_hover, fg=self.theme.btn_text, relief="flat", padx=10, pady=6)
-        btn_edit_resource = tk.Button(buttons, text="Editar item", command=on_edit, bg=self.theme.btn_hover, fg=self.theme.btn_text, relief="flat", padx=10, pady=6)
-        btn_del_resource = tk.Button(buttons, text="Excluir item", command=on_delete, bg=self.theme.btn_hover, fg=self.theme.btn_text, relief="flat", padx=10, pady=6)
-        btn_close = tk.Button(buttons, text="Fechar", command=win.destroy, bg=self.theme.btn_hover, fg=self.theme.btn_text, relief="flat", padx=10, pady=6)
-
-        btn_run_resource.grid(row=0, column=0, sticky="ew", padx=(0, 8))
-        btn_add_resource.grid(row=0, column=1, sticky="ew", padx=(0, 8))
-        btn_edit_resource.grid(row=0, column=2, sticky="ew", padx=(0, 8))
-        btn_del_resource.grid(row=0, column=3, sticky="ew", padx=(0, 8))
-        btn_close.grid(row=0, column=4, sticky="ew")
-
-        listbox.bind("<<ListboxSelect>>", update_details)
-        listbox.bind("<Double-Button-1>", on_run)
-
-        refresh_list()
 
     def toggle_theme(self):
         self.theme = LIGHT if self.theme == DARK else DARK
@@ -1334,8 +870,7 @@ class ShortCutsManagerApp:
 
             total = int(sc.get("total_clicks", 0))
             wcount = _get_weekly_count(sc, week)
-            resources_count = len(sc.get("resources", []))
-            stats = tk.Label(card, text=f"Semana: {wcount} | Total: {total} | Itens: {resources_count}", font=("Segoe UI", 9), bg=th.btn, fg=th.muted)
+            stats = tk.Label(card, text=f"Semana: {wcount} | Total: {total}", font=("Segoe UI", 9), bg=th.btn, fg=th.muted)
             if compact_cards:
                 stats.grid(row=2, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="w")
             else:
@@ -1343,24 +878,21 @@ class ShortCutsManagerApp:
 
             actions = tk.Frame(card, bg=th.btn)
             btn_run = tk.Button(actions, text="Abrir", command=lambda n=name: self.run_shortcut(n), bg=th.accent, fg="#ffffff", relief="flat", padx=10, pady=6)
-            btn_resources = tk.Button(actions, text="Itens", command=lambda n=name: self.manage_resources(n), bg=th.btn_hover, fg=th.btn_text, relief="flat", padx=10, pady=6)
             btn_edit = tk.Button(actions, text="Editar", command=lambda n=name: self.edit_shortcut(n), bg=th.btn_hover, fg=th.btn_text, relief="flat", padx=10, pady=6)
             btn_del = tk.Button(actions, text="Excluir", command=lambda n=name: self.delete_shortcut(n), bg=th.btn_hover, fg=th.btn_text, relief="flat", padx=10, pady=6)
 
             if compact_cards:
                 actions.grid(row=3, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew")
-                for action_col in range(4):
+                for action_col in range(3):
                     actions.grid_columnconfigure(action_col, weight=1, uniform="card_actions")
                 btn_run.grid(row=0, column=0, sticky="ew", padx=(0, 6))
-                btn_resources.grid(row=0, column=1, sticky="ew", padx=3)
-                btn_edit.grid(row=0, column=2, sticky="ew", padx=3)
-                btn_del.grid(row=0, column=3, sticky="ew", padx=(6, 0))
+                btn_edit.grid(row=0, column=1, sticky="ew", padx=3)
+                btn_del.grid(row=0, column=2, sticky="ew", padx=(6, 0))
             else:
                 actions.grid(row=0, column=2, rowspan=3, padx=10, pady=10, sticky="ns")
                 btn_run.grid(row=0, column=0, sticky="ew")
-                btn_resources.grid(row=1, column=0, sticky="ew", pady=8)
-                btn_edit.grid(row=2, column=0, sticky="ew")
-                btn_del.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+                btn_edit.grid(row=1, column=0, sticky="ew", pady=8)
+                btn_del.grid(row=2, column=0, sticky="ew")
 
             def on_enter(_e, c=card):
                 c.configure(bg=th.btn_hover)

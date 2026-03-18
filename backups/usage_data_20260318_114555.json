@@ -3,7 +3,7 @@
     "settings": {
         "theme": "dark",
         "sort_mode": "weekly",
-        "last_report_week": "2026-W11"
+        "last_report_week": "2026-W12"
     },
     "shortcuts": {
         "GLOSSÁRIO": {
@@ -29,13 +29,14 @@
                 "programas",
                 "python"
             ],
-            "total_clicks": 13,
+            "total_clicks": 14,
             "weekly_clicks": {
                 "2026-W10": 3,
-                "2026-W11": 10
+                "2026-W11": 10,
+                "2026-W12": 1
             },
             "created_at": "2026-03-04T20:52:25",
-            "last_used_at": "2026-03-14T07:40:35"
+            "last_used_at": "2026-03-16T07:25:30"
         },
         "SEFAZ": {
             "target": "C:\\Users\\diego\\Desktop\\001-Desktop\\diegoPaladino\\IA\\Nexa\\ECOSSISTEMA\\CLT-Concurso-Financia\\2-Concurso\\SEFAZ",
@@ -46,13 +47,14 @@
                 "prova",
                 "sefaz"
             ],
-            "total_clicks": 11,
+            "total_clicks": 14,
             "weekly_clicks": {
                 "2026-W10": 3,
-                "2026-W11": 8
+                "2026-W11": 9,
+                "2026-W12": 2
             },
             "created_at": "2026-03-05T05:29:22",
-            "last_used_at": "2026-03-14T11:52:46"
+            "last_used_at": "2026-03-16T19:04:23"
         },
         "Rede_escola": {
             "target": "C:\\Users\\Public",
@@ -77,12 +79,13 @@
                 "concurso",
                 "sefaz"
             ],
-            "total_clicks": 7,
+            "total_clicks": 20,
             "weekly_clicks": {
-                "2026-W11": 7
+                "2026-W11": 17,
+                "2026-W12": 3
             },
             "created_at": "2026-03-14T07:42:37",
-            "last_used_at": "2026-03-15T08:32:06"
+            "last_used_at": "2026-03-16T21:16:01"
         }
     }
 }
